@@ -2,6 +2,7 @@ import userModel from "../model/user.model.js"
 import crypto from "crypto"
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
+import { decode } from "punycode";
 
 export async function register(req,res){
     const {username, email, password} = req.body;
@@ -59,5 +60,13 @@ export async function getMe(req,res){
 
     const decoded = jwt.verify(token, config.JWT_SECRET);
 
-    console.log(decoded);
+    const user = await userModel.findById(decoded.id);
+    
+    res.status(200).json({
+        message : "user fetched successfully",
+        user : { 
+            username:   user.username,
+            email: user.email,
+        }
+    })
 }
