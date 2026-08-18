@@ -51,7 +51,7 @@ export async function register(req,res){
 
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === "production", // false for local HTTP, true for HTTPS
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
@@ -93,4 +93,71 @@ export async function getMe(req,res){
             email: user.email,
         }
     })
+}
+
+// export async function refreshToken(req, res) {
+//     const refreshToken = req.cookies.refreshToken;
+
+//     if(!refreshToken){
+//         return res.status(401).json({
+//             message: "Refresh token not found"
+//         })
+//     }
+
+//     const decode = jwt.verify(refreshToken, config.JWT_SECRET);
+
+//     const accessToken = jwt.sign(
+//         { id: decode.id }, 
+//         config.JWT_SECRET,
+//         { expiresIn: "15m" }
+//     );
+
+//     res.status(200).json({
+//         message: "Access token refreshed successfully",
+//         accessToken
+//     })
+// }
+export async function refreshToken(req, res) {
+    // 1. Fixed: Use req.cookies (plural)
+    const refreshToken = req.cookies?.refreshToken; 
+
+    if(!refreshToken){
+        return res.status(401).json({
+            message: "Refresh token not found"
+        });
+    }
+
+    const newRefreshToken = jwt.sign(
+        { id: decode.id },
+        config.JWT_SECRET,
+        { expiresIn: "7d"}
+    );
+
+    res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // false for local HTTP, true for HTTPS
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // 2. Fixed: Add try...catch to handle invalid/expired tokens
+    try {
+        const decode = jwt.verify(refreshToken, config.JWT_SECRET);
+
+        const accessToken = jwt.sign(
+            { id: decode.id }, 
+            config.JWT_SECRET,
+            { expiresIn: "15m" }
+        );
+
+        res.status(200).json({
+            message: "Access token refreshed successfully",
+            accessToken
+        });
+    } catch (error) {
+        // If the token is expired or tampered with, jwt.verify throws an error
+        return res.status(403).json({
+            message: "Invalid or expired refresh token"
+        });
+    }
 }
