@@ -30,15 +30,39 @@ export async function register(req,res){
     const token = jwt.sign(
         { id: user._id }, 
         config.JWT_SECRET,
-        { expiresIn: "1d" });
-        
+        { expiresIn: "1d" }
+    );
+    
+    const accessToken = jwt.sign({
+        id: user._id
+    }, config.JWT_SECRET,
+        {
+            expiresIn: "15m"
+        }
+    );
+
+    const refreshToken = jwt.sign({
+        id: user._id
+    }, config.JWT_SECRET,
+        {
+            expiresIn: "7d"
+        }
+    );
+
+    res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    
     res.status(201).json({
         message: "User registered successfully",
         user: {
             username: user.usernamem,
             email: user.email,
         },
-        token
+        accessToken
     })
     // if(!username || !email || !password){
     //     return res.status(400).json({
