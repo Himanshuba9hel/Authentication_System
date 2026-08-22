@@ -113,12 +113,30 @@ export async function refreshToken(req, res) {
         // 1. Verify the old token FIRST
         const decode = jwt.verify(refreshToken, config.JWT_SECRET);
 
+        const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+        const session = await sessionModel.findOne({
+            refreshTokenHash,
+            revoked: false
+        });
+
+        if (!session) {
+            return res.status(401).json({
+                message: "Invalid refresh token"
+            })
+        }
+
         // 2. NOW you can safely use decode.id to make the new refresh token
         const newRefreshToken = jwt.sign(
             { id: decode.id },
             config.JWT_SECRET,
             { expiresIn: "7d"}
         );
+
+        const newRefreshTokenHash = crypto.createHash("sha256").update(newRefreshToken).digest("hex");    
+
+        session.refreshTokenHash = newRefreshTokenHash;
+        await session.save();
 
         // 3. Set the new cookie
         res.cookie("refreshToken", newRefreshToken, {
@@ -146,3 +164,34 @@ export async function refreshToken(req, res) {
         });
     }
 }
+
+export async function logout(req, res) {
+    const refreshToken = req.cookies.refreshToken;
+    if(!refreshToken){
+        return res.status(400).json({
+            message: "Refresh token not found"
+        })
+    }
+
+    const refreshTokenHash = crypto.createHash("sha256").update(refreshToken).digest("hex");
+
+    const session = await sessionModel.findOne({
+        refreshTokenHash,
+        revoked: false
+    });
+
+    if(!session){
+        return res.status(400).json({
+            message: "Invalid refresh token"
+        })
+    }
+
+    session.revoked = true;
+    await session.save();
+
+    res.clearCookie("refreshToken")
+
+    res.status(200).json({
+        message: "Logged out successfully"
+    })
+};
